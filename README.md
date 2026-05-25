@@ -25,6 +25,21 @@ The console expects the service API at `http://localhost:8000` by default.
 LLM_EVALUATION_API_BASE_URL=http://localhost:8000 streamlit run streamlit_app.py
 ```
 
+## Docker
+
+```bash
+docker build -t llm-evaluation-console .
+docker run --rm -p 8501:8501 \
+  -e LLM_EVALUATION_API_BASE_URL=http://host.docker.internal:8000 \
+  llm-evaluation-console
+```
+
+The GitHub Actions workflow builds the image on pull requests and publishes images from `main` to:
+
+```text
+ghcr.io/bfalkowski/llm-evaluation-console
+```
+
 ## Service Contract
 
 The console calls:

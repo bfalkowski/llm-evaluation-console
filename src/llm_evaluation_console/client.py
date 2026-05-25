@@ -9,11 +9,16 @@ DEFAULT_API_BASE_URL = "http://localhost:8000"
 
 
 class ServiceClient:
-    def __init__(self, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         configured_url = (
             base_url or os.getenv("LLM_EVALUATION_API_BASE_URL") or DEFAULT_API_BASE_URL
         )
         self.base_url = configured_url.rstrip("/")
+        self._transport = transport
 
     def ready(self) -> dict[str, Any]:
         return self._request("GET", "/health/ready")
@@ -63,7 +68,11 @@ class ServiceClient:
 
     def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:
-            with httpx.Client(base_url=self.base_url, timeout=10.0) as client:
+            with httpx.Client(
+                base_url=self.base_url,
+                timeout=10.0,
+                transport=self._transport,
+            ) as client:
                 response = client.request(method, path, **kwargs)
                 response.raise_for_status()
                 return response.json()

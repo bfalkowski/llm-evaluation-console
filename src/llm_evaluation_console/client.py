@@ -8,15 +8,17 @@ import httpx
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 
 
+def get_configured_api_base_url() -> str:
+    return os.getenv("LLM_EVALUATION_API_BASE_URL") or DEFAULT_API_BASE_URL
+
+
 class ServiceClient:
     def __init__(
         self,
         base_url: str | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        configured_url = (
-            base_url or os.getenv("LLM_EVALUATION_API_BASE_URL") or DEFAULT_API_BASE_URL
-        )
+        configured_url = base_url or get_configured_api_base_url()
         self.base_url = configured_url.rstrip("/")
         self._transport = transport
 

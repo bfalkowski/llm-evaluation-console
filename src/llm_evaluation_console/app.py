@@ -7,7 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from llm_evaluation_console.client import DEFAULT_API_BASE_URL, ServiceClient
+from llm_evaluation_console.client import ServiceClient, get_configured_api_base_url
 
 st.set_page_config(
     page_title="LLM Evaluation Console",
@@ -103,7 +103,7 @@ def load_jobs(
     return list(response.get("items", []))
 
 
-api_base_url = st.sidebar.text_input("API base URL", value=DEFAULT_API_BASE_URL)
+api_base_url = st.sidebar.text_input("API base URL", value=get_configured_api_base_url())
 tenant_id = st.sidebar.text_input("Tenant", value="demo-tenant")
 project_id = st.sidebar.text_input("Project", value="demo-project")
 limit = st.sidebar.slider("Rows", min_value=5, max_value=100, value=25, step=5)

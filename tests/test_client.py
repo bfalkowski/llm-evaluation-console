@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 import pytest
 
-from llm_evaluation_console.client import ServiceClient
+from llm_evaluation_console.client import ServiceClient, get_configured_api_base_url
 
 
 def make_client(handler: httpx.MockTransport) -> ServiceClient:
@@ -106,3 +106,9 @@ def test_http_errors_raise_runtime_error_with_response_body() -> None:
 
     with pytest.raises(RuntimeError, match="not found"):
         client.get_evaluation("missing-job")
+
+
+def test_configured_api_base_url_uses_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_EVALUATION_API_BASE_URL", "http://cluster-service:80")
+
+    assert get_configured_api_base_url() == "http://cluster-service:80"

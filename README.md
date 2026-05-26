@@ -40,6 +40,10 @@ The GitHub Actions workflow builds the image on pull requests and publishes imag
 ghcr.io/bfalkowski/llm-evaluation-console
 ```
 
+CI also runs dependency auditing with `pip-audit` and validates the Dockerfile policy
+for non-root runtime, no `latest` base image tag, no-cache package installs, and
+exec-form `CMD`.
+
 ## Service Contract
 
 The console calls:

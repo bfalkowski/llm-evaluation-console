@@ -2,18 +2,26 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    HOME=/tmp \
+    XDG_CONFIG_HOME=/tmp \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_PORT=8501
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
-COPY src ./src
-COPY streamlit_app.py ./
+RUN groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app
+
+COPY --chown=app:app pyproject.toml README.md ./
+COPY --chown=app:app src ./src
+COPY --chown=app:app streamlit_app.py ./
 
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir .
+
+USER app
 
 EXPOSE 8501
 

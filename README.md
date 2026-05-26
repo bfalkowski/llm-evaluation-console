@@ -1,6 +1,7 @@
 # LLM Evaluation Console
 
-Streamlit operator console for submitting LLM evaluation jobs and reviewing service results.
+Streamlit operator console for submitting LLM evaluation jobs, reviewing service results,
+and checking operational health.
 
 ## Local Setup
 
@@ -69,5 +70,13 @@ The console calls:
 
 Evaluation routes use bearer-token tenant context when a token is supplied. Tenant
 query/body parameters are only used as the auth-disabled local fallback.
+
+## Console Views
+
+- Overview dashboard with run counts, status mix, recent scores, and latest activity.
+- Submit form for evaluation requests.
+- Evaluation table with tenant/project/status/score context.
+- Detail view with result justification and request payload inspection.
+- Operations view backed by the service `/metrics` endpoint.
 
 Do not commit secrets, credentials, private URLs, or environment-specific config.

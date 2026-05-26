@@ -49,5 +49,6 @@ The console calls:
 - `GET /v1/evaluations`
 - `GET /v1/evaluations/{job_id}`
 - `GET /v1/evaluations/{job_id}/details?tenant_id=...`
+- `GET /metrics`
 
 Do not commit secrets, credentials, private URLs, or environment-specific config.

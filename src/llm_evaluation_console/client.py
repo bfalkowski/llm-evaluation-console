@@ -25,6 +25,9 @@ class ServiceClient:
     def ready(self) -> dict[str, Any]:
         return self._request("GET", "/health/ready")
 
+    def metrics(self) -> str:
+        return self._request_text("GET", "/metrics")
+
     def submit_evaluation(
         self,
         *,
@@ -69,6 +72,14 @@ class ServiceClient:
         )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
+        response = self._send(method, path, **kwargs)
+        return response.json()
+
+    def _request_text(self, method: str, path: str, **kwargs: Any) -> str:
+        response = self._send(method, path, **kwargs)
+        return response.text
+
+    def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
             with httpx.Client(
                 base_url=self.base_url,
@@ -77,7 +88,7 @@ class ServiceClient:
             ) as client:
                 response = client.request(method, path, **kwargs)
                 response.raise_for_status()
-                return response.json()
+                return response
         except httpx.HTTPStatusError as exc:
             detail = exc.response.text.strip()
             raise RuntimeError(detail or f"Service returned {exc.response.status_code}") from exc

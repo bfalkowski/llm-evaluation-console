@@ -8,6 +8,7 @@ import plotly.express as px
 import streamlit as st
 
 from llm_evaluation_console.client import ServiceClient, get_configured_api_base_url
+from llm_evaluation_console.metrics import parse_prometheus_text, sum_metric
 
 st.set_page_config(
     page_title="LLM Evaluation Console",
@@ -103,6 +104,46 @@ def load_jobs(
     return list(response.get("items", []))
 
 
+def render_operations_metrics(client: ServiceClient) -> None:
+    try:
+        samples = parse_prometheus_text(client.metrics())
+    except RuntimeError as exc:
+        st.error(str(exc))
+        return
+
+    total_requests = sum_metric(samples, "http_requests_total")
+    queued = sum_metric(samples, "evaluation_jobs_total", {"status": "queued"})
+    succeeded = sum_metric(samples, "evaluation_jobs_total", {"status": "succeeded"})
+    failed = sum_metric(samples, "evaluation_jobs_total", {"status": "failed"})
+    scoring_count = sum_metric(samples, "evaluation_scoring_duration_seconds_count")
+    scoring_sum = sum_metric(samples, "evaluation_scoring_duration_seconds_sum")
+    recovered = sum_metric(samples, "evaluation_worker_recovered_jobs_total")
+    average_scoring_ms = (scoring_sum / scoring_count * 1000) if scoring_count else 0
+
+    top = st.columns(4)
+    top[0].metric("HTTP requests", f"{total_requests:.0f}")
+    top[1].metric("Succeeded jobs", f"{succeeded:.0f}")
+    top[2].metric("Failed jobs", f"{failed:.0f}")
+    top[3].metric("Avg scoring", f"{average_scoring_ms:.1f} ms")
+
+    lower = st.columns(3)
+    lower[0].metric("Queued jobs", f"{queued:.0f}")
+    lower[1].metric("Scoring samples", f"{scoring_count:.0f}")
+    lower[2].metric("Recovered stale jobs", f"{recovered:.0f}")
+
+    if samples:
+        st.dataframe(
+            pd.DataFrame(samples),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "name": st.column_config.TextColumn("Metric", width="medium"),
+                "labels": st.column_config.JsonColumn("Labels"),
+                "value": st.column_config.NumberColumn("Value"),
+            },
+        )
+
+
 api_base_url = st.sidebar.text_input("API base URL", value=get_configured_api_base_url())
 tenant_id = st.sidebar.text_input("Tenant", value="demo-tenant")
 project_id = st.sidebar.text_input("Project", value="demo-project")
@@ -119,7 +160,9 @@ try:
 except RuntimeError as exc:
     health_slot.error(str(exc))
 
-submit_tab, jobs_tab, detail_tab = st.tabs(["Submit", "Evaluations", "Detail"])
+submit_tab, jobs_tab, detail_tab, operations_tab = st.tabs(
+    ["Submit", "Evaluations", "Detail", "Operations"]
+)
 
 with submit_tab:
     with st.form("submit-evaluation"):
@@ -156,6 +199,9 @@ with submit_tab:
             st.success(f"Queued {created['job_id']}")
         except RuntimeError as exc:
             st.error(str(exc))
+
+with operations_tab:
+    render_operations_metrics(client)
 
 with jobs_tab:
     left, right = st.columns([0.7, 0.3], vertical_alignment="top")

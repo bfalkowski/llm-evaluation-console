@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from llm_evaluation_console.client import ServiceClient, get_configured_api_base_url
+from llm_evaluation_console.metrics import parse_prometheus_text, sum_metric
 
 
 def make_client(handler: httpx.MockTransport) -> ServiceClient:
@@ -96,6 +97,35 @@ def test_get_evaluation_details_uses_tenant_scope() -> None:
         "path": "/v1/evaluations/job-1/details",
         "tenant_id": "tenant-a",
     }
+
+
+def test_metrics_fetches_prometheus_text() -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        return httpx.Response(200, text='evaluation_jobs_total{status="queued"} 2')
+
+    client = make_client(httpx.MockTransport(handler))
+
+    assert client.metrics() == 'evaluation_jobs_total{status="queued"} 2'
+    assert seen == {"path": "/metrics"}
+
+
+def test_parse_prometheus_text_and_sum_metrics() -> None:
+    samples = parse_prometheus_text(
+        """
+        # HELP evaluation_jobs_total Evaluation jobs.
+        # TYPE evaluation_jobs_total counter
+        evaluation_jobs_total{status="queued"} 2
+        evaluation_jobs_total{status="succeeded"} 3
+        http_requests_total{method="GET",route="/health/ready",status_code="200"} 4
+        """
+    )
+
+    assert sum_metric(samples, "evaluation_jobs_total") == 5
+    assert sum_metric(samples, "evaluation_jobs_total", {"status": "queued"}) == 2
+    assert sum_metric(samples, "http_requests_total", {"method": "GET"}) == 4
 
 
 def test_http_errors_raise_runtime_error_with_response_body() -> None:

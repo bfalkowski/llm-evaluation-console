@@ -25,6 +25,18 @@ The console expects the service API at `http://localhost:8000` by default.
 LLM_EVALUATION_API_BASE_URL=http://localhost:8000 streamlit run streamlit_app.py
 ```
 
+If the service is running with `APP_AUTH_ENABLED=true`, generate a demo token in the
+service repository and paste it into the console sidebar's bearer token field:
+
+```bash
+APP_AUTH_DEMO_SECRET=local-demo-secret \
+python scripts/create_demo_jwt.py --tenant-id demo-tenant --subject local-user
+```
+
+When a bearer token is configured, the console sends `Authorization: Bearer <token>`
+and lets the service derive tenant context from the token claims. Without a token, the
+console keeps sending the sidebar tenant field for auth-disabled local workflows.
+
 ## Docker
 
 ```bash
@@ -52,7 +64,10 @@ The console calls:
 - `POST /v1/evaluations`
 - `GET /v1/evaluations`
 - `GET /v1/evaluations/{job_id}`
-- `GET /v1/evaluations/{job_id}/details?tenant_id=...`
+- `GET /v1/evaluations/{job_id}/details`
 - `GET /metrics`
+
+Evaluation routes use bearer-token tenant context when a token is supplied. Tenant
+query/body parameters are only used as the auth-disabled local fallback.
 
 Do not commit secrets, credentials, private URLs, or environment-specific config.

@@ -10,8 +10,12 @@ from llm_evaluation_console.client import ServiceClient, get_configured_api_base
 from llm_evaluation_console.metrics import parse_prometheus_text, sum_metric
 
 
-def make_client(handler: httpx.MockTransport) -> ServiceClient:
-    return ServiceClient(base_url="http://service.test", transport=handler)
+def make_client(handler: httpx.MockTransport, bearer_token: str | None = None) -> ServiceClient:
+    return ServiceClient(
+        base_url="http://service.test",
+        bearer_token=bearer_token,
+        transport=handler,
+    )
 
 
 def json_response(payload: dict[str, Any], status_code: int = 200) -> httpx.Response:
@@ -57,6 +61,40 @@ def test_submit_evaluation_sends_expected_payload() -> None:
     }
 
 
+def test_submit_evaluation_with_token_omits_tenant_payload_and_sets_auth_header() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["authorization"] = request.headers["authorization"]
+        seen["payload"] = json.loads(request.content)
+        return json_response(
+            {
+                "job_id": "job-1",
+                "status": "queued",
+                "request_id": "request-1",
+            }
+        )
+
+    client = make_client(httpx.MockTransport(handler), bearer_token="demo-token")
+
+    client.submit_evaluation(
+        tenant_id="tenant-a",
+        project_id="project-a",
+        question="question",
+        answer="answer",
+        rubric=None,
+    )
+
+    assert seen == {
+        "authorization": "Bearer demo-token",
+        "payload": {
+            "project_id": "project-a",
+            "question": "question",
+            "answer": "answer",
+        },
+    }
+
+
 def test_list_evaluations_sets_tenant_project_and_limit_query_params() -> None:
     seen: dict[str, str] = {}
 
@@ -80,6 +118,47 @@ def test_list_evaluations_sets_tenant_project_and_limit_query_params() -> None:
     }
 
 
+def test_list_evaluations_with_token_omits_tenant_query_param() -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(dict(request.url.params))
+        return json_response({"items": []})
+
+    client = make_client(httpx.MockTransport(handler), bearer_token="demo-token")
+
+    response = client.list_evaluations(
+        tenant_id="tenant-a",
+        project_id="project-a",
+        limit=10,
+    )
+
+    assert response == {"items": []}
+    assert seen == {
+        "project_id": "project-a",
+        "limit": "10",
+    }
+
+
+def test_get_evaluation_uses_tenant_scope_without_token() -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["tenant_id"] = request.url.params["tenant_id"]
+        return json_response({"job_id": "job-1"})
+
+    client = make_client(httpx.MockTransport(handler))
+
+    response = client.get_evaluation("job-1", tenant_id="tenant-a")
+
+    assert response["job_id"] == "job-1"
+    assert seen == {
+        "path": "/v1/evaluations/job-1",
+        "tenant_id": "tenant-a",
+    }
+
+
 def test_get_evaluation_details_uses_tenant_scope() -> None:
     seen: dict[str, str] = {}
 
@@ -96,6 +175,27 @@ def test_get_evaluation_details_uses_tenant_scope() -> None:
     assert seen == {
         "path": "/v1/evaluations/job-1/details",
         "tenant_id": "tenant-a",
+    }
+
+
+def test_get_evaluation_details_with_token_omits_tenant_query_param() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        seen["authorization"] = request.headers["authorization"]
+        return json_response({"job_id": "job-1", "question": "q", "answer": "a"})
+
+    client = make_client(httpx.MockTransport(handler), bearer_token="demo-token")
+
+    response = client.get_evaluation_details(job_id="job-1", tenant_id="tenant-a")
+
+    assert response["job_id"] == "job-1"
+    assert seen == {
+        "path": "/v1/evaluations/job-1/details",
+        "params": {},
+        "authorization": "Bearer demo-token",
     }
 
 

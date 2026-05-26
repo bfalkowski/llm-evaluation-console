@@ -148,9 +148,10 @@ def main() -> None:
     api_base_url = st.sidebar.text_input("API base URL", value=get_configured_api_base_url())
     tenant_id = st.sidebar.text_input("Tenant", value="demo-tenant")
     project_id = st.sidebar.text_input("Project", value="demo-project")
+    bearer_token = st.sidebar.text_input("Bearer token", value="", type="password")
     limit = st.sidebar.slider("Rows", min_value=5, max_value=100, value=25, step=5)
 
-    client = ServiceClient(api_base_url)
+    client = ServiceClient(api_base_url, bearer_token=bearer_token.strip() or None)
 
     st.title("LLM Evaluation Console")
 
@@ -252,7 +253,7 @@ def main() -> None:
 
         if selected_job_id:
             try:
-                job = client.get_evaluation(selected_job_id)
+                job = client.get_evaluation(selected_job_id, tenant_id=tenant_id)
                 top = st.columns(4)
                 top[0].metric(
                     "Score",
@@ -271,7 +272,7 @@ def main() -> None:
                 if st.button("Load payload"):
                     details = client.get_evaluation_details(
                         job_id=selected_job_id,
-                        tenant_id=job["tenant_id"],
+                        tenant_id=job.get("tenant_id") or tenant_id,
                     )
                     st.subheader("Question")
                     st.write(details.get("question", ""))

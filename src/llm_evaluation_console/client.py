@@ -16,10 +16,12 @@ class ServiceClient:
     def __init__(
         self,
         base_url: str | None = None,
+        bearer_token: str | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         configured_url = base_url or get_configured_api_base_url()
         self.base_url = configured_url.rstrip("/")
+        self._bearer_token = bearer_token.strip() if bearer_token else None
         self._transport = transport
 
     def ready(self) -> dict[str, Any]:
@@ -38,11 +40,12 @@ class ServiceClient:
         rubric: str | None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "tenant_id": tenant_id,
             "project_id": project_id,
             "question": question,
             "answer": answer,
         }
+        if not self._bearer_token:
+            payload["tenant_id"] = tenant_id
         if rubric:
             payload["rubric"] = rubric
 
@@ -55,21 +58,29 @@ class ServiceClient:
         project_id: str | None,
         limit: int,
     ) -> dict[str, Any]:
-        params: dict[str, Any] = {"tenant_id": tenant_id, "limit": limit}
+        params: dict[str, Any] = {"limit": limit}
+        if not self._bearer_token:
+            params["tenant_id"] = tenant_id
         if project_id:
             params["project_id"] = project_id
 
         return self._request("GET", "/v1/evaluations", params=params)
 
-    def get_evaluation(self, job_id: str) -> dict[str, Any]:
-        return self._request("GET", f"/v1/evaluations/{job_id}")
+    def get_evaluation(self, job_id: str, tenant_id: str | None = None) -> dict[str, Any]:
+        params = self._tenant_params(tenant_id)
+        return self._request("GET", f"/v1/evaluations/{job_id}", params=params)
 
-    def get_evaluation_details(self, *, job_id: str, tenant_id: str) -> dict[str, Any]:
+    def get_evaluation_details(self, *, job_id: str, tenant_id: str | None) -> dict[str, Any]:
         return self._request(
             "GET",
             f"/v1/evaluations/{job_id}/details",
-            params={"tenant_id": tenant_id},
+            params=self._tenant_params(tenant_id),
         )
+
+    def _tenant_params(self, tenant_id: str | None) -> dict[str, str]:
+        if self._bearer_token or tenant_id is None:
+            return {}
+        return {"tenant_id": tenant_id}
 
     def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         response = self._send(method, path, **kwargs)
@@ -81,12 +92,15 @@ class ServiceClient:
 
     def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         try:
+            headers = dict(kwargs.pop("headers", {}))
+            if self._bearer_token:
+                headers["authorization"] = f"Bearer {self._bearer_token}"
             with httpx.Client(
                 base_url=self.base_url,
                 timeout=10.0,
                 transport=self._transport,
             ) as client:
-                response = client.request(method, path, **kwargs)
+                response = client.request(method, path, headers=headers, **kwargs)
                 response.raise_for_status()
                 return response
         except httpx.HTTPStatusError as exc:

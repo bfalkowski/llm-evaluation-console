@@ -322,12 +322,15 @@ def main() -> None:
     project_id = st.sidebar.text_input("Project", value="demo-project")
     bearer_token = st.sidebar.text_input("Bearer token", value="", type="password")
     limit = st.sidebar.slider("Rows", min_value=5, max_value=100, value=25, step=5)
+    if st.sidebar.button("Refresh data", type="primary"):
+        st.rerun()
 
-    client = ServiceClient(api_base_url, bearer_token=bearer_token.strip() or None)
+    client = ServiceClient(api_base_url.strip(), bearer_token=bearer_token.strip() or None)
     auth_mode = "bearer token" if bearer_token.strip() else "tenant fallback"
 
     api_status = "API unavailable"
     api_available = False
+    list_error: str | None = None
     try:
         health = client.ready()
         api_status = f"API {health.get('status', 'ready')}"
@@ -341,8 +344,16 @@ def main() -> None:
     if api_available:
         try:
             jobs = load_jobs(client, tenant_id, project_id, limit)
+            st.sidebar.caption(f"Loaded {len(jobs)} evaluation(s) for project filter.")
         except RuntimeError as exc:
-            st.error(str(exc))
+            list_error = str(exc)
+            st.error(f"Could not load evaluations: {list_error}")
+
+    if api_available and not jobs and list_error is None:
+        st.info(
+            "No evaluations returned. After a local API restart, in-memory jobs are cleared — "
+            "submit a new evaluation or clear the Project filter to list all projects."
+        )
 
     overview_tab, submit_tab, jobs_tab, detail_tab, operations_tab = st.tabs(
         ["Overview", "Submit", "Evaluations", "Detail", "Operations"]
@@ -394,7 +405,8 @@ def main() -> None:
                     rubric=rubric.strip() or None,
                 )
                 st.session_state["selected_job_id"] = created["job_id"]
-                st.success(f"Queued {created['job_id']}")
+                st.success(f"Submitted {created['job_id']} ({created.get('status', 'queued')})")
+                st.rerun()
             except RuntimeError as exc:
                 st.error(str(exc))
 

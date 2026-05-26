@@ -288,16 +288,18 @@ def render_operations_metrics(client: ServiceClient) -> None:
     scoring_count = sum_metric(samples, "evaluation_scoring_duration_seconds_count")
     scoring_sum = sum_metric(samples, "evaluation_scoring_duration_seconds_sum")
     recovered = sum_metric(samples, "evaluation_worker_recovered_jobs_total")
+    queue_depth = sum_metric(samples, "evaluation_queue_depth")
     average_scoring_ms = (scoring_sum / scoring_count * 1000) if scoring_count else 0
 
-    top = st.columns(4)
+    top = st.columns(5)
     top[0].metric("HTTP requests", f"{total_requests:.0f}")
     top[1].metric("Succeeded jobs", f"{succeeded:.0f}")
     top[2].metric("Failed jobs", f"{failed:.0f}")
-    top[3].metric("Avg scoring", f"{average_scoring_ms:.1f} ms")
+    top[3].metric("Queue depth", f"{queue_depth:.0f}")
+    top[4].metric("Avg scoring", f"{average_scoring_ms:.1f} ms")
 
     lower = st.columns(3)
-    lower[0].metric("Queued jobs", f"{queued:.0f}")
+    lower[0].metric("Queued (counter)", f"{queued:.0f}")
     lower[1].metric("Scoring samples", f"{scoring_count:.0f}")
     lower[2].metric("Recovered stale jobs", f"{recovered:.0f}")
 
